@@ -32,3 +32,4 @@ metals.sbt
 /.worksheet/
 
 secret/
+src/main/resources/application.conf
