@@ -7,7 +7,8 @@ lazy val root = project
     libraryDependencies ++= Seq(
       "io.cequence" %% "openai-scala-client" % "1.0.0",
       "io.github.apimorphism" %% "telegramium-high" % "8.74.0",
-      "org.tpolecat" %% "skunk-core" % "1.1.0-M3",
+      "org.tpolecat" %% "skunk-core" % "1.0.0-M6",
+      "dev.rolang" %% "dumbo" % "0.3.3",
       "org.typelevel" %% "cats-effect" % "3.5.4",
       "org.typelevel" %% "cats-core" % "2.12.0",
       "com.github.pureconfig" %% "pureconfig-core" % "0.17.7",

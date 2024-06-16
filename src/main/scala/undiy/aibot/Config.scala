@@ -1,6 +1,5 @@
 package undiy.aibot
 
-import cats.effect.IO
 import pureconfig.generic.*
 import pureconfig.generic.semiauto.deriveReader
 import pureconfig.{ConfigReader, ConfigSource}
@@ -28,13 +27,20 @@ case class AIConfig(
     model: String
 )
 
+case class DbConfig(
+    host: String,
+    port: Int,
+    database: String,
+    user: String,
+    password: String
+)
+
 case class Config(
     bot: BotConfig,
-    ai: AIConfig
+    ai: AIConfig,
+    db: DbConfig
 ) derives ConfigReader
 
 object Config {
-  def load: IO[Config] = IO {
-    ConfigSource.default.loadOrThrow[Config]
-  }
+  def load(): Config = ConfigSource.default.loadOrThrow[Config]
 }
