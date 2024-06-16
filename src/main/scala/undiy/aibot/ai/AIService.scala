@@ -1,8 +1,5 @@
-package ai
+package undiy.aibot.ai
 
-import cats.effect.Async
-
-
-trait AIService[F[_]: Async] {
+trait AIService[F[_]] {
   def makeCompletion(prompt: String): F[String]
 }

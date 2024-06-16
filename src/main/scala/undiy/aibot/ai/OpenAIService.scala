@@ -1,4 +1,4 @@
-package ai
+package undiy.aibot.ai
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
@@ -10,7 +10,7 @@ import undiy.aibot.AIConfig
 
 import scala.concurrent.ExecutionContext
 
-class OpenAIService(
+final class OpenAIService(
     config: AIConfig
 ) extends AIService[IO] {
 

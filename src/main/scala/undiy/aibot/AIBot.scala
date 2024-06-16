@@ -9,8 +9,9 @@ import org.http4s.client.middleware.Logger
 import telegramium.bots.high.implicits.*
 import telegramium.bots.high.{Api, BotApi, LongPollBot}
 import telegramium.bots.{ChatIntId, Message}
+import undiy.aibot.context.ContextService
 
-class AIBot[F[_] : Async : Parallel](using bot: Api[F], aiService: AIService[F])
+class AIBot[F[_] : Async : Parallel](using bot: Api[F], aiService: AIService[F], contextService: ContextService[F])
     extends LongPollBot[F](bot) {
     override def onMessage(msg: Message): F[Unit] = {
       msg.text match {
@@ -39,7 +40,7 @@ class AIBot[F[_] : Async : Parallel](using bot: Api[F], aiService: AIService[F])
 }
 
 object AIBot {
-  def start[F[_] : Async : Parallel](config: BotConfig)(using AIService[F]): F[Unit] = {
+  def start[F[_] : Async : Parallel](config: BotConfig)(using AIService[F], ContextService[F]): F[Unit] = {
     BlazeClientBuilder[F].resource.use { httpClient =>
       val http = Logger(logBody = config.log.body, logHeaders = config.log.headers)(httpClient)
 
