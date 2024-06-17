@@ -8,12 +8,11 @@ import skunk.data.Completion
 import skunk.implicits.sql
 import undiy.aibot.context.model.{ContextChat, ContextMessage, ContextUser}
 
-import java.time.LocalDateTime
-
-final class DbContextService[F[_]: Async](using session: Session[F]) extends ContextService[F] {
+final class DbContextService[F[_]: Async](using session: Session[F])
+    extends ContextService[F] {
 
   private val messageDecoder: Decoder[ContextMessage] =
-    (int4 *: text *: timestamp *: int8 *: varchar *: int8 *: bool *: varchar)
+    (int4 *: text *: timestamptz *: int8 *: varchar.opt *: int8 *: bool *: varchar.opt)
       .map {
         case (
               messageId,
@@ -23,7 +22,7 @@ final class DbContextService[F[_]: Async](using session: Session[F]) extends Con
               chatTitle,
               userId,
               isBot,
-              username: String
+              username
             ) =>
           ContextMessage(
             messageId = messageId,
@@ -39,15 +38,15 @@ final class DbContextService[F[_]: Async](using session: Session[F]) extends Con
       SELECT context_messages.message_id, context_messages.content, context_messages.created_at, context_chats.id, context_chats.title, context_users.id, context_users.is_bot, context_users.username
       FROM context_messages
       INNER JOIN context_chats on context_messages.chat_id = context_chats.id
-      INNER JOIN context_users on context_messages.user_id = context_user.id
-      WHERE context_chat.id = $int8
+      INNER JOIN context_users on context_messages.user_id = context_users.id
+      WHERE context_chats.id = $int8
       ORDER BY context_messages.created_at DESC LIMIT $int4
       """.query(messageDecoder)
 
   private val insertChat: Command[ContextChat] =
     sql"""
       INSERT INTO context_chats (id, title)
-      VALUES ($int8, $varchar)
+      VALUES ($int8, ${varchar.opt})
       ON CONFLICT(id) DO NOTHING
     """.command
       .to[ContextChat]
@@ -55,7 +54,7 @@ final class DbContextService[F[_]: Async](using session: Session[F]) extends Con
   private val insertUser: Command[ContextUser] =
     sql"""
       INSERT INTO context_users (id, is_bot, username)
-      VALUES ($int8, $bool, $varchar)
+      VALUES ($int8, $bool, ${varchar.opt})
       ON CONFLICT(id) DO NOTHING
     """.command
       .to[ContextUser]
@@ -63,7 +62,7 @@ final class DbContextService[F[_]: Async](using session: Session[F]) extends Con
   private val insertMessage: Command[ContextMessage] =
     sql"""
       INSERT INTO context_messages (message_id, content, created_at, chat_id, user_id)
-      VALUES ($int4, $text, $timestamp, $int8, $int8)
+      VALUES ($int4, $text, $timestamptz, $int8, $int8)
     """.command
       .contramap {
         case ContextMessage(messageId, content, createdAt, chat, user) =>
@@ -79,7 +78,7 @@ final class DbContextService[F[_]: Async](using session: Session[F]) extends Con
   }
 
   override def getContextMessages(
-      chatId: Int,
+      chatId: Long,
       limit: Int = 100
   ): F[List[ContextMessage]] =
     session.execute(queryMessages)(chatId, limit)

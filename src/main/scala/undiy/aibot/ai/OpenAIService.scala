@@ -4,15 +4,25 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.effect.IO
 import io.cequence.openaiscala.domain.settings.CreateChatCompletionSettings
-import io.cequence.openaiscala.domain.{SystemMessage, UserMessage}
+import io.cequence.openaiscala.domain.{
+  AssistantMessage,
+  SystemMessage,
+  UserMessage
+}
 import io.cequence.openaiscala.service.OpenAIChatCompletionServiceFactory
 import undiy.aibot.AIConfig
+import undiy.aibot.context.ContextService
+import undiy.aibot.context.model.ContextMessage
 
+import scala.::
 import scala.concurrent.ExecutionContext
 
 final class OpenAIService(
     config: AIConfig
-) extends AIService[IO] {
+)(using contextService: ContextService[IO])
+    extends AIService[IO] {
+
+  private val logger = org.log4s.getLogger
 
   private val system = ActorSystem("openai-client-system")
 
@@ -25,26 +35,54 @@ final class OpenAIService(
     authHeaders = Seq(("Authorization", s"Bearer ${config.apiKey}"))
   )
 
-  override def makeCompletion(prompt: String): IO[String] = {
+  override def makeCompletion(prompt: String): IO[String] = IO.fromFuture(
+    IO(
+      aiService
+        .createChatCompletion(
+          messages = Seq(
+            SystemMessage("You are a kind helpful assistant."),
+            UserMessage(prompt)
+          ),
+          settings = CreateChatCompletionSettings(
+            model = config.model,
+            max_tokens = Some(250)
+          )
+        )
+        .map { chatCompletion =>
+          // trim the response if it didn't fit into limit
+          val response = chatCompletion.choices.head.message.content
+          response.take(response.lastIndexOf('\n'))
+        }
+    )
+  )
+
+  override def makeChatCompletion(messages: List[ContextMessage]): IO[String] =
     IO.fromFuture(
-      IO(
+      IO {
+        val chatMessages =
+          SystemMessage("You are a helpful chat bot") :: messages.map({ m =>
+            if (m.user.isBot) {
+              AssistantMessage(m.content, m.user.username)
+            } else {
+              UserMessage(m.content, m.user.username)
+            }
+          })
+
+        logger.info(s"Mesages:\n${chatMessages.mkString("\n")}")
+
         aiService
           .createChatCompletion(
-            messages = Seq(
-              SystemMessage("You are a kind helpful assistant."),
-              UserMessage(prompt)
-            ),
+            messages = chatMessages,
             settings = CreateChatCompletionSettings(
-              model = config.model,
-              max_tokens = Some(250)
+              model = config.model
             )
           )
           .map { chatCompletion =>
-            // trim the response if it didn't fit into limit
-            val response = chatCompletion.choices.head.message.content
-            response.take(response.lastIndexOf('\n'))
+
+            logger.info(s"Response: ${chatCompletion.choices.head}")
+
+            chatCompletion.choices.head.message.content
           }
-      )
+      }
     )
-  }
 }
