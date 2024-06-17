@@ -5,15 +5,10 @@ import cats.effect.Async
 import cats.syntax.all.*
 import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.client.middleware.Logger
+import telegramium.bots.*
 import telegramium.bots.high.implicits.*
+import telegramium.bots.high.messageentities.MessageEntities
 import telegramium.bots.high.{Api, BotApi, LongPollBot}
-import telegramium.bots.{
-  BotCommandMessageEntity,
-  Chat,
-  ChatIntId,
-  Message,
-  User
-}
 import undiy.aibot.ai.AIService
 import undiy.aibot.context.ContextService
 import undiy.aibot.context.model.{ContextChat, ContextMessage, ContextUser}
@@ -29,7 +24,7 @@ class AIBot[F[_]: Async: Parallel](using
   private val logger = org.log4s.getLogger
 
   extension (msg: Message) {
-    def toContextMessage: ContextMessage = ContextMessage(
+    private def toContextMessage: ContextMessage = ContextMessage(
       messageId = msg.messageId,
       content = msg.text.getOrElse(""),
       createdAt = OffsetDateTime
@@ -38,23 +33,29 @@ class AIBot[F[_]: Async: Parallel](using
       user = msg.from.get.toContextUser
     )
 
-    def hasCommand: Boolean = msg.entities.exists({
+    private def hasCommand: Boolean = msg.entities.exists({
       case command: BotCommandMessageEntity => true
       case _                                => false
     })
 
-    def isPrivate: Boolean = msg.chat.`type` == "private"
+    private def isPrivate: Boolean = msg.chat.`type` == "private"
+
+    private def getEntityContent(messageEntity: MessageEntity): String =
+      msg.text.get.slice(
+        messageEntity.offset,
+        messageEntity.offset + messageEntity.length
+      )
   }
 
   extension (user: User) {
-    def toContextUser: ContextUser = user match {
+    private def toContextUser: ContextUser = user match {
       case User(id, isBot, _, _, username, _, _, _, _, _, _, _) =>
         ContextUser(id, isBot, username)
     }
   }
 
   extension (chat: Chat) {
-    def toContextChat: ContextChat = chat match {
+    private def toContextChat: ContextChat = chat match {
       case Chat(id, _, title, _, _, _, _) => ContextChat(id, title)
     }
   }
@@ -71,7 +72,7 @@ class AIBot[F[_]: Async: Parallel](using
         text = "\uD83E\uDD14" // thinking emoji
       ).exec
       _ <- contextService.saveContextMessage(msg.toContextMessage)
-      contextMessages <- contextService.getContextMessages(msg.chat.id.toLong)
+      contextMessages <- contextService.getContextMessages(msg.chat.id)
       response <- aiService.makeChatCompletion(contextMessages.reverse)
       _ <- deleteMessage(
         chatId = ChatIntId(msg.chat.id),
@@ -86,8 +87,45 @@ class AIBot[F[_]: Async: Parallel](using
   }
 
   private def onChatMessage(msg: Message): F[Unit] = {
-    // TODO
-    summon[Async[F]].unit
+    getMe().exec.flatMap({ botUser =>
+      if (
+        msg.entities.exists {
+          case entity @ MentionMessageEntity(offset, length) =>
+            msg.getEntityContent(entity) == s"@${botUser.username.getOrElse("")}"
+          case TextMentionMessageEntity(offset, length, user) => user == botUser
+          case _                                              => false
+        }
+      ) {
+        // request chat completion
+        for {
+          thinkingMessage <- sendMessage(
+            chatId = ChatIntId(msg.chat.id),
+            text = "\uD83E\uDD14" // thinking emoji
+          ).exec
+          _ <- contextService.saveContextMessage(msg.toContextMessage)
+          contextMessages <- contextService.getContextMessages(msg.chat.id)
+          response <- aiService.makeChatCompletion(contextMessages.reverse)
+          _ <- deleteMessage(
+            chatId = ChatIntId(msg.chat.id),
+            messageId = thinkingMessage.messageId
+          ).exec
+          responseEntities = MessageEntities()
+            .mention(s"@${msg.from.get.username.getOrElse("")}")
+            .plain(" ")
+            .plain(response)
+
+          newMessage <- sendMessage(
+            chatId = ChatIntId(msg.chat.id),
+            text = responseEntities.toPlainText(),
+            entities = responseEntities.toTelegramEntities()
+          ).exec
+          _ <- contextService.saveContextMessage(newMessage.toContextMessage)
+        } yield {}
+      } else {
+        // just save context message
+        contextService.saveContextMessage(msg.toContextMessage)
+      }
+    })
   }
 
   override def onMessage(msg: Message): F[Unit] = {
