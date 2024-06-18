@@ -34,7 +34,7 @@ class AIBot[F[_]: Async: Parallel](using
             "Make a simple prompt with no additional context (message history)",
           // TODO refactor this part
           action = (msg, prompt) => {
-            if (!prompt.isBlank) {
+            if (prompt.trim.nonEmpty) {
               for {
                 thinkingMessage <- sendMessage(
                   chatId = ChatIntId(msg.chat.id),
@@ -156,7 +156,7 @@ class AIBot[F[_]: Async: Parallel](using
   override def onMessage(msg: Message): F[Unit] = {
     msg.text match {
       // handle only messages with non-empty text
-      case Some(text) if !text.isBlank =>
+      case Some(text) if text.trim.nonEmpty =>
         msg.getCommand match {
           case Some((command, args)) => onCommand(msg, command, args)
           case None =>

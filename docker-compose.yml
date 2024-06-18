@@ -1,0 +1,31 @@
+version: '3.3'
+services:
+  context-db:
+    image: "postgres:${POSTGRES_VERSION}"
+    container_name: just-another-ai-bot.context-db
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - ai-bot-data:/var/lib/postgresql/data
+    networks:
+      - ai-bot-local
+
+  bot:
+    image: just-another-ai-bot:latest
+    container_name: just-another-ai-bot.bot
+    env_file: ".env"
+    networks:
+      - ai-bot-local
+    depends_on:
+      - context-db
+
+volumes:
+  ai-bot-data:
+
+networks:
+  ai-bot-local:
+

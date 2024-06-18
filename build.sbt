@@ -18,4 +18,10 @@ lazy val root = project
       "org.scalameta" %% "munit" % "1.0.0" % Test
     )
   )
+
+enablePlugins(JavaAppPackaging)
+enablePlugins(DockerPlugin)
+
 val scala3Version = "3.4.2"
+
+dockerUpdateLatest := true
