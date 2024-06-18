@@ -4,6 +4,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import undiy.aibot.ai.{AIService, OpenAIService}
+import undiy.aibot.bot.AIBot
 import undiy.aibot.context.{ContextService, DbContextService}
 
 object App extends IOApp {

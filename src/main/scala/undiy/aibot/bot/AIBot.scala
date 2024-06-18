@@ -1,4 +1,4 @@
-package undiy.aibot
+package undiy.aibot.bot
 
 import cats.Parallel
 import cats.effect.Async
@@ -9,11 +9,10 @@ import telegramium.bots.*
 import telegramium.bots.high.implicits.*
 import telegramium.bots.high.messageentities.MessageEntities
 import telegramium.bots.high.{Api, BotApi, LongPollBot}
+import undiy.aibot.BotConfig
 import undiy.aibot.ai.AIService
 import undiy.aibot.context.ContextService
-import undiy.aibot.context.model.{ContextChat, ContextMessage, ContextUser}
-
-import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import undiy.aibot.bot.TelegramModelExt.*
 
 class AIBot[F[_]: Async: Parallel](using
     bot: Api[F],
@@ -22,43 +21,6 @@ class AIBot[F[_]: Async: Parallel](using
 ) extends LongPollBot[F](bot) {
 
   private val logger = org.log4s.getLogger
-
-  extension (msg: Message) {
-    private def toContextMessage: ContextMessage = ContextMessage(
-      messageId = msg.messageId,
-      content = msg.text.getOrElse(""),
-      createdAt = OffsetDateTime
-        .ofInstant(Instant.ofEpochSecond(msg.date), ZoneOffset.UTC),
-      chat = msg.chat.toContextChat,
-      user = msg.from.get.toContextUser
-    )
-
-    private def hasCommand: Boolean = msg.entities.exists({
-      case command: BotCommandMessageEntity => true
-      case _                                => false
-    })
-
-    private def isPrivate: Boolean = msg.chat.`type` == "private"
-
-    private def getEntityContent(messageEntity: MessageEntity): String =
-      msg.text.get.slice(
-        messageEntity.offset,
-        messageEntity.offset + messageEntity.length
-      )
-  }
-
-  extension (user: User) {
-    private def toContextUser: ContextUser = user match {
-      case User(id, isBot, _, _, username, _, _, _, _, _, _, _) =>
-        ContextUser(id, isBot, username)
-    }
-  }
-
-  extension (chat: Chat) {
-    private def toContextChat: ContextChat = chat match {
-      case Chat(id, _, title, _, _, _, _) => ContextChat(id, title)
-    }
-  }
 
   private def onCommand(msg: Message): F[Unit] = {
     // TODO
@@ -87,15 +49,9 @@ class AIBot[F[_]: Async: Parallel](using
   }
 
   private def onChatMessage(msg: Message): F[Unit] = {
+    // TODO cache botUser
     getMe().exec.flatMap({ botUser =>
-      if (
-        msg.entities.exists {
-          case entity @ MentionMessageEntity(offset, length) =>
-            msg.getEntityContent(entity) == s"@${botUser.username.getOrElse("")}"
-          case TextMentionMessageEntity(offset, length, user) => user == botUser
-          case _                                              => false
-        }
-      ) {
+      if (msg.hasMentionForUser(botUser)) {
         // request chat completion
         for {
           thinkingMessage <- sendMessage(
@@ -131,16 +87,25 @@ class AIBot[F[_]: Async: Parallel](using
   override def onMessage(msg: Message): F[Unit] = {
     msg.text match {
       // handle only messages with non-empty text
-      case Some(prompt) if !prompt.isBlank => {
+      case Some(text) if !text.isBlank => {
         if (msg.hasCommand) {
           onCommand(msg)
-        } else if (msg.isPrivate) {
+        } else if (msg.chat.isPrivate) {
           onPrivateChatMessage(msg)
         } else {
           onChatMessage(msg)
         }
       }
       case _ => summon[Async[F]].unit
+    }
+  }
+
+  override def onEditedMessage(msg: Message): F[Unit] = {
+    // only update regular messages, skip commands
+    if (!msg.hasCommand) {
+      contextService.saveContextMessage(msg.toContextMessage)
+    } else {
+      summon[Async[F]].unit
     }
   }
 }

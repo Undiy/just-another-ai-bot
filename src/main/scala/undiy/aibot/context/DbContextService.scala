@@ -63,6 +63,8 @@ final class DbContextService[F[_]: Async](using session: Session[F])
     sql"""
       INSERT INTO context_messages (message_id, content, created_at, chat_id, user_id)
       VALUES ($int4, $text, $timestamptz, $int8, $int8)
+      ON CONFLICT (chat_id, message_id) DO UPDATE
+      SET content = EXCLUDED.content
     """.command
       .contramap {
         case ContextMessage(messageId, content, createdAt, chat, user) =>
