@@ -4,31 +4,21 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.effect.IO
 import io.cequence.openaiscala.domain.settings.CreateChatCompletionSettings
-import io.cequence.openaiscala.domain.{
-  AssistantMessage,
-  SystemMessage,
-  UserMessage
-}
+import io.cequence.openaiscala.domain.{AssistantMessage, SystemMessage, UserMessage}
 import io.cequence.openaiscala.service.OpenAIChatCompletionServiceFactory
 import undiy.aibot.AIConfig
-import undiy.aibot.context.ContextService
 import undiy.aibot.context.model.ContextMessage
 
-import scala.::
 import scala.concurrent.ExecutionContext
 
 final class OpenAIService(
     config: AIConfig
-)(using contextService: ContextService[IO])
+)(using ec: ExecutionContext)
     extends AIService[IO] {
 
   private val logger = org.log4s.getLogger
 
-  private val system = ActorSystem("openai-client-system")
-
-  private given ExecutionContext = system.dispatcher
-
-  private given Materializer = Materializer(system)
+  private given Materializer = Materializer(ActorSystem("openai-client-system"))
 
   private val aiService = OpenAIChatCompletionServiceFactory(
     coreUrl = config.baseUrl,

@@ -1,6 +1,7 @@
 package undiy.aibot
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{Async, ExitCode, IO, IOApp}
+import cats.syntax.all.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import undiy.aibot.ai.{AIService, OpenAIService}
@@ -15,14 +16,17 @@ object App extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     logger.info("Start!")
 
-    IO {
-      Config.load()
-    }.flatMap(config => {
+    (
+      IO(Config.load()),
+      Async[IO].executionContext
+    ).flatMapN({ case (config, ec) =>
       Database
         .init[IO](config.db)
         .use(session => {
           given Session[IO] = session
-          given AIService[IO] = OpenAIService(config.ai)
+
+          given AIService[IO] = OpenAIService(config.ai)(using ec)
+
           given ContextService[IO] = DbContextService[IO]
 
           AIBot.start[IO](config.bot).as(ExitCode.Success)
