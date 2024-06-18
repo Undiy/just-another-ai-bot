@@ -71,6 +71,12 @@ final class DbContextService[F[_]: Async](using session: Session[F])
           messageId *: content *: createdAt *: chat.id *: user.id *: EmptyTuple
       }
 
+  private val deleteMessages: Command[Long] =
+    sql"""
+      DELETE FROM context_messages
+      WHERE chat_id = $int8
+    """.command
+
   override def saveContextMessage(message: ContextMessage): F[Unit] = {
     for {
       _ <- session.execute(insertChat)(message.chat)
@@ -84,4 +90,7 @@ final class DbContextService[F[_]: Async](using session: Session[F])
       limit: Int = 100
   ): F[List[ContextMessage]] =
     session.execute(queryMessages)(chatId, limit)
+
+  override def deleteContextMessages(chatId: Long): F[Unit] =
+    session.execute(deleteMessages)(chatId).void
 }

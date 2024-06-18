@@ -11,8 +11,8 @@ import telegramium.bots.high.messageentities.MessageEntities
 import telegramium.bots.high.{Api, BotApi, LongPollBot}
 import undiy.aibot.BotConfig
 import undiy.aibot.ai.AIService
-import undiy.aibot.context.ContextService
 import undiy.aibot.bot.TelegramModelExt.*
+import undiy.aibot.context.ContextService
 
 class AIBot[F[_]: Async: Parallel](using
     bot: Api[F],
@@ -22,9 +22,78 @@ class AIBot[F[_]: Async: Parallel](using
 
   private val logger = org.log4s.getLogger
 
-  private def onCommand(msg: Message): F[Unit] = {
-    // TODO
-    summon[Async[F]].unit
+  private enum AIBotCommand(
+      val command: String,
+      val description: String,
+      val action: (Message, String) => F[Unit]
+  ) {
+    case Prompt
+        extends AIBotCommand(
+          command = "prompt",
+          description =
+            "Make a simple prompt with no additional context (message history)",
+          // TODO refactor this part
+          action = (msg, prompt) => {
+            if (!prompt.isBlank) {
+              for {
+                thinkingMessage <- sendMessage(
+                  chatId = ChatIntId(msg.chat.id),
+                  text = "\uD83E\uDD14" // thinking emoji
+                ).exec
+                response <- aiService.makeCompletion(prompt)
+                _ <- deleteMessage(
+                  chatId = ChatIntId(msg.chat.id),
+                  messageId = thinkingMessage.messageId
+                ).exec
+                newMessage <- sendMessage(
+                  chatId = ChatIntId(msg.chat.id),
+                  text = response
+                ).exec
+              } yield {}
+            } else {
+              sendMessage(
+                chatId = ChatIntId(msg.chat.id),
+                text =
+                  "Please write the actual prompt after the /prompt command"
+              ).exec.void
+            }
+          }
+        )
+
+    case ResetContext
+        extends AIBotCommand(
+          command = "resetcontext",
+          description =
+            "Deletes all the bot's message context for this chat. WARNING: this cannot be undone",
+          // TODO add confirmation
+          action = (msg, _) => contextService.deleteContextMessages(msg.chat.id)
+        )
+
+    private def toBotCommand: BotCommand = BotCommand(command, description)
+  }
+
+  private object AIBotCommand {
+    def fromString(command: String): Option[AIBotCommand] =
+      values.find(_.command == command)
+
+    def setCommands(): F[Boolean] = setMyCommands(
+      commands = values.map(_.toBotCommand).toList
+    ).exec
+  }
+
+  private def onCommand(
+      msg: Message,
+      command: String,
+      args: String
+  ): F[Unit] = {
+    AIBotCommand.fromString(command) match {
+      case Some(botCommand) => botCommand.action(msg, args)
+      case None =>
+        sendMessage(
+          chatId = ChatIntId(msg.chat.id),
+          text = s"Unknown command: $command"
+        ).exec.void
+    }
   }
 
   private def onPrivateChatMessage(msg: Message): F[Unit] = {
@@ -87,19 +156,21 @@ class AIBot[F[_]: Async: Parallel](using
   override def onMessage(msg: Message): F[Unit] = {
     msg.text match {
       // handle only messages with non-empty text
-      case Some(text) if !text.isBlank => {
-        if (msg.hasCommand) {
-          onCommand(msg)
-        } else if (msg.chat.isPrivate) {
-          onPrivateChatMessage(msg)
-        } else {
-          onChatMessage(msg)
+      case Some(text) if !text.isBlank =>
+        msg.getCommand match {
+          case Some((command, args)) => onCommand(msg, command, args)
+          case None =>
+            if (msg.chat.isPrivate) {
+              onPrivateChatMessage(msg)
+            } else {
+              onChatMessage(msg)
+            }
         }
-      }
       case _ => summon[Async[F]].unit
     }
   }
 
+  // Unfortunately, telegram bot API don't provide updates for deleted messages, only about edited
   override def onEditedMessage(msg: Message): F[Unit] = {
     // only update regular messages, skip commands
     if (!msg.hasCommand) {
@@ -108,6 +179,11 @@ class AIBot[F[_]: Async: Parallel](using
       summon[Async[F]].unit
     }
   }
+
+  override def start(): F[Unit] = for {
+    _ <- AIBotCommand.setCommands()
+    _ <- super.start()
+  } yield {}
 }
 
 object AIBot {
