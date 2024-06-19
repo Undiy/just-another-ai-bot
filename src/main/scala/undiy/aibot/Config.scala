@@ -13,6 +13,7 @@ extension (c: ConfigReader.type)
 
 case class BotConfig(
     token: String,
+    streaming: Boolean = true,
     about: Option[String],
     description: Option[String],
     messages: BotMessages = BotMessages(),

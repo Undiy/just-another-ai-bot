@@ -1,6 +1,6 @@
 package undiy.aibot.bot
 
-import cats.{Monad, Parallel}
+import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all.*
 import org.http4s.blaze.client.BlazeClientBuilder
@@ -22,6 +22,8 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
 
   private val logger = org.log4s.getLogger
 
+  private val requestHelper = AIBotRequestHelper(config)
+
   private enum AIBotCommand(
       val command: String,
       val description: String,
@@ -34,9 +36,9 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
             "Make a simple prompt with no additional context (message history)",
           action = (msg, prompt) => {
             if (prompt.trim.nonEmpty) {
-              performAIServiceRequest(
+              requestHelper.requestCompletion(
                 chat = msg.chat,
-                request = aiService.makeCompletion(prompt),
+                prompt = prompt,
                 onResponse = response =>
                   sendMessage(
                     chatId = ChatIntId(msg.chat.id),
@@ -74,33 +76,6 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
     ).exec
   }
 
-  private def performAIServiceRequest(
-      chat: Chat,
-      request: F[String],
-      onResponse: String => F[Unit]
-  ): F[Unit] = for {
-    thinkingMessage <- sendMessage(
-      chatId = ChatIntId(chat.id),
-      text = config.messages.processing
-    ).exec
-    _ <- request.redeemWith(
-      { e =>
-        logger.warn(e)("Failed to perform AI request")
-        sendMessage(
-          chatId = ChatIntId(chat.id),
-          text = config.messages.error
-        ).exec.void
-      },
-      // we're interested only in non-empty response
-      response =>
-        if (response.trim.nonEmpty) onResponse(response) else Async[F].unit
-    )
-    _ <- deleteMessage(
-      chatId = ChatIntId(chat.id),
-      messageId = thinkingMessage.messageId
-    ).exec
-  } yield {}
-
   private def onCommand(
       msg: Message,
       command: String,
@@ -117,13 +92,8 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
   }
 
   private def onPrivateChatMessage(msg: Message): F[Unit] = {
-    performAIServiceRequest(
-      chat = msg.chat,
-      request = for {
-        _ <- contextService.saveContextMessage(msg.toContextMessage)
-        contextMessages <- contextService.getContextMessages(msg.chat.id)
-        response <- aiService.makeChatCompletion(contextMessages.reverse)
-      } yield response,
+    requestHelper.requestChatCompletion(
+      msg = msg,
       onResponse = response =>
         for {
           newMessage <- sendMessage(
@@ -140,13 +110,8 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
     getMe().exec.flatMap({ botUser =>
       if (msg.hasMentionForUser(botUser)) {
         // request chat completion
-        performAIServiceRequest(
-          chat = msg.chat,
-          request = for {
-            _ <- contextService.saveContextMessage(msg.toContextMessage)
-            contextMessages <- contextService.getContextMessages(msg.chat.id)
-            response <- aiService.makeChatCompletion(contextMessages.reverse)
-          } yield response,
+        requestHelper.requestChatCompletion(
+          msg = msg,
           onResponse = { response =>
             val user = msg.from.get
             val responseEntities = MessageEntities()
