@@ -13,7 +13,15 @@ extension (c: ConfigReader.type)
 
 case class BotConfig(
     token: String,
+    about: Option[String],
+    description: Option[String],
+    messages: BotMessages = BotMessages(),
     log: BotRequestLogConfig = BotRequestLogConfig()
+)
+
+case class BotMessages(
+    processing: String = "\uD83E\uDD14", // thinking emoji
+    error: String = "Something went wrong, try again later."
 )
 
 case class BotRequestLogConfig(

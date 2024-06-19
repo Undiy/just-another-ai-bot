@@ -4,7 +4,11 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.effect.IO
 import io.cequence.openaiscala.domain.settings.CreateChatCompletionSettings
-import io.cequence.openaiscala.domain.{AssistantMessage, SystemMessage, UserMessage}
+import io.cequence.openaiscala.domain.{
+  AssistantMessage,
+  SystemMessage,
+  UserMessage
+}
 import io.cequence.openaiscala.service.OpenAIChatCompletionServiceFactory
 import undiy.aibot.AIConfig
 import undiy.aibot.context.model.ContextMessage
@@ -33,15 +37,14 @@ final class OpenAIService(
             SystemMessage("You are a kind helpful assistant."),
             UserMessage(prompt)
           ),
+          // TODO add configurable limit
           settings = CreateChatCompletionSettings(
-            model = config.model,
-            max_tokens = Some(250)
+            model = config.model
           )
         )
         .map { chatCompletion =>
-          // trim the response if it didn't fit into limit
-          val response = chatCompletion.choices.head.message.content
-          response.take(response.lastIndexOf('\n'))
+          logger.info(s"Response: ${chatCompletion.choices.head}")
+          chatCompletion.choices.head.message.content
         }
     )
   )
@@ -63,6 +66,7 @@ final class OpenAIService(
         aiService
           .createChatCompletion(
             messages = chatMessages,
+            // TODO add configurable limit
             settings = CreateChatCompletionSettings(
               model = config.model
             )
