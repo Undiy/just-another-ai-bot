@@ -25,7 +25,7 @@ object App extends IOApp {
         .use(session => {
           given Session[IO] = session
 
-          given AIService[IO] = OpenAIService(config.ai)(using ec)
+          given AIService[IO] = OpenAIService(config.ai)(using Async[IO], ec)
 
           given ContextService[IO] = DbContextService[IO]
 
