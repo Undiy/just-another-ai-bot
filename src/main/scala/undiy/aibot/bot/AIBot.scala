@@ -14,6 +14,22 @@ import undiy.aibot.ai.AIService
 import undiy.aibot.bot.TelegramModelExt.*
 import undiy.aibot.context.ContextService
 
+/** Telegram bot implementation
+  * @param config
+  *   telegram bot configuration
+  * @param async$F$0
+  *   async typeclass
+  * @param parallel$F$1
+  *   parallel typeclass
+  * @param bot
+  *   telegram bot API
+  * @param aiService
+  *   AI service
+  * @param contextService
+  *   Context service
+  * @tparam F
+  *   effect type
+  */
 class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
     bot: Api[F],
     aiService: AIService[F],
@@ -179,6 +195,19 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
 }
 
 object AIBot {
+
+  /** Starts telegram bot
+    * @param config
+    *   telegram bot configuration
+    * @param x$2
+    *   AI service
+    * @param x$3
+    *   Context service
+    * @tparam F
+    *   effect type
+    * @return
+    *   async (shouldn't terminate while the bot is running)
+    */
   def start[F[_]: Async: Parallel](
       config: BotConfig
   )(using AIService[F], ContextService[F]): F[Unit] = {

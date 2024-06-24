@@ -8,6 +8,14 @@ import skunk.data.Completion
 import skunk.implicits.sql
 import undiy.aibot.context.model.{ContextChat, ContextMessage, ContextUser}
 
+/** Context service implementation backed by PostgreSQL db
+  * @param async$F$0
+  *   async typeclass
+  * @param session
+  *   skunk session
+  * @tparam F
+  *   effect type
+  */
 final class DbContextService[F[_]: Async](using session: Session[F])
     extends ContextService[F] {
 
@@ -33,7 +41,17 @@ final class DbContextService[F[_]: Async](using session: Session[F])
           )
       }
 
-  private val queryMessages: Query[(Long, Int), ContextMessage] =
+  private val queryMessages: Query[Long, ContextMessage] =
+    sql"""
+        SELECT context_messages.message_id, context_messages.content, context_messages.created_at, context_chats.id, context_chats.title, context_users.id, context_users.is_bot, context_users.username
+        FROM context_messages
+        INNER JOIN context_chats on context_messages.chat_id = context_chats.id
+        INNER JOIN context_users on context_messages.user_id = context_users.id
+        WHERE context_chats.id = $int8
+        ORDER BY context_messages.created_at DESC
+        """.query(messageDecoder)
+
+  private val queryMessagesWithLimit: Query[(Long, Int), ContextMessage] =
     sql"""
       SELECT context_messages.message_id, context_messages.content, context_messages.created_at, context_chats.id, context_chats.title, context_users.id, context_users.is_bot, context_users.username
       FROM context_messages
@@ -87,9 +105,11 @@ final class DbContextService[F[_]: Async](using session: Session[F])
 
   override def getContextMessages(
       chatId: Long,
-      limit: Int = 100
-  ): F[List[ContextMessage]] =
-    session.execute(queryMessages)(chatId, limit)
+      limit: Option[Int]
+  ): F[List[ContextMessage]] = limit match {
+    case Some(limit) => session.execute(queryMessagesWithLimit)(chatId, limit)
+    case None        => session.execute(queryMessages)(chatId)
+  }
 
   override def deleteContextMessages(chatId: Long): F[Unit] =
     session.execute(deleteMessages)(chatId).void

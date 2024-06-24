@@ -19,6 +19,17 @@ import undiy.aibot.context.model.ContextMessage
 
 import scala.concurrent.ExecutionContext
 
+/** AIService implementation that makes request to openai-compatible chat
+  * completion API
+  * @param config
+  *   configuration
+  * @param async$F$0
+  *   async typeclass
+  * @param ec
+  *   execution context
+  * @tparam F
+  *   effect type
+  */
 final class OpenAIService[F[_]: Async](
     config: AIConfig
 )(using ec: ExecutionContext)
@@ -41,9 +52,9 @@ final class OpenAIService[F[_]: Async](
             SystemMessage("You are a kind helpful assistant."),
             UserMessage(prompt)
           ),
-          // TODO add configurable limit
           settings = CreateChatCompletionSettings(
-            model = config.model
+            model = config.model,
+            max_tokens = config.maxTokens
           )
         )
         .map { chatCompletion =>
@@ -53,16 +64,16 @@ final class OpenAIService[F[_]: Async](
     )
   )
 
-  def makeCompletionStreamed(prompt: String): Stream[F, String] = {
+  override def makeCompletionStreamed(prompt: String): Stream[F, String] = {
     aiService
       .createChatCompletionStreamed(
         messages = Seq(
           SystemMessage("You are a kind helpful assistant."),
           UserMessage(prompt)
         ),
-        // TODO add configurable limit
         settings = CreateChatCompletionSettings(
-          model = config.model
+          model = config.model,
+          max_tokens = config.maxTokens
         )
       )
       .mapConcat { chatCompletion =>
@@ -89,9 +100,9 @@ final class OpenAIService[F[_]: Async](
         aiService
           .createChatCompletion(
             messages = chatMessages,
-            // TODO add configurable limit
             settings = CreateChatCompletionSettings(
-              model = config.model
+              model = config.model,
+              max_tokens = config.maxTokens
             )
           )
           .map { chatCompletion =>
@@ -120,9 +131,9 @@ final class OpenAIService[F[_]: Async](
     aiService
       .createChatCompletionStreamed(
         messages = chatMessages,
-        // TODO add configurable limit
         settings = CreateChatCompletionSettings(
-          model = config.model
+          model = config.model,
+          max_tokens = config.maxTokens
         )
       )
       .mapConcat { chatCompletion =>

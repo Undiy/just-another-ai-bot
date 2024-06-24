@@ -7,9 +7,19 @@ import fs2.io.net.Network
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 
+/** Utility object to establish DB connection
+  */
 object Database {
   private val logger = org.log4s.getLogger
 
+  /** Initialize DB connection and run migrations
+    * @param config
+    *   database connection configuration
+    * @tparam F
+    *   effect type
+    * @return
+    *   skunk session resource
+    */
   def init[F[_]: Async: Tracer: Network: Console](
       config: DbConfig
   ): Resource[F, Session[F]] = {

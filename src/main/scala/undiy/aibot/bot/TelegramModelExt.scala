@@ -5,6 +5,8 @@ import undiy.aibot.context.model.{ContextChat, ContextMessage, ContextUser}
 
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 
+/** Extensions for telegram API models
+  */
 object TelegramModelExt {
   extension (msg: Message) {
     def toContextMessage: ContextMessage = {

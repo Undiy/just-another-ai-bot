@@ -19,10 +19,10 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
   private val logger = org.log4s.getLogger
 
   def requestCompletion(
-                                 chat: Chat,
-                                 prompt: String,
-                                 onResponse: String => F[Unit]
-                               ): F[Unit] = {
+      chat: Chat,
+      prompt: String,
+      onResponse: String => F[Unit]
+  ): F[Unit] = {
     if (config.streaming) {
       performAIServiceStreamedRequest(
         chat = chat,
@@ -47,7 +47,8 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
         chat = msg.chat,
         request = for {
           _ <- contextService.saveContextMessage(msg.toContextMessage)
-          contextMessages <- contextService.getContextMessages(msg.chat.id)
+          contextMessages <- contextService
+            .getContextMessages(msg.chat.id, config.maxContextMessages)
         } yield aiService.makeChatCompletionStreamed(contextMessages.reverse),
         onResponsePart = onResponse
       )
@@ -56,7 +57,8 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
         chat = msg.chat,
         for {
           _ <- contextService.saveContextMessage(msg.toContextMessage)
-          contextMessages <- contextService.getContextMessages(msg.chat.id)
+          contextMessages <- contextService
+            .getContextMessages(msg.chat.id, config.maxContextMessages)
           response <- aiService.makeChatCompletion(contextMessages.reverse)
         } yield response,
         onResponse = onResponse
