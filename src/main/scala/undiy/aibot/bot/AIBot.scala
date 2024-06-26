@@ -30,63 +30,15 @@ import undiy.aibot.context.ContextService
   * @tparam F
   *   effect type
   */
-class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
+class AIBot[F[_]: Async: Parallel](val config: BotConfig)(using
     bot: Api[F],
     aiService: AIService[F],
     contextService: ContextService[F]
-) extends LongPollBot[F](bot) {
+) extends LongPollBot[F](bot)
+    with AIBotRequestHelper[F]
+    with AIBotCommands[F] {
 
   private val logger = org.log4s.getLogger
-
-  private val requestHelper = AIBotRequestHelper(config)
-
-  private enum AIBotCommand(
-      val command: String,
-      val description: String,
-      val action: (Message, String) => F[Unit]
-  ) {
-    case Prompt
-        extends AIBotCommand(
-          command = "prompt",
-          description = "Make a simple prompt with no additional context (message history)",
-          action = (msg, prompt) => {
-            if (prompt.trim.nonEmpty) {
-              requestHelper.requestCompletion(
-                chat = msg.chat,
-                prompt = prompt,
-                onResponse = response =>
-                  sendMessage(
-                    chatId = ChatIntId(msg.chat.id),
-                    text = response
-                  ).exec.void
-              )
-            } else {
-              sendMessage(
-                chatId = ChatIntId(msg.chat.id),
-                text = "Please write the actual prompt after the /prompt command"
-              ).exec.void
-            }
-          }
-        )
-
-    case ResetContext
-        extends AIBotCommand(
-          command = "resetcontext",
-          description = "Deletes all the bot's message context for this chat. WARNING: this cannot be undone",
-          // TODO add confirmation
-          action = (msg, _) => contextService.deleteContextMessages(msg.chat.id)
-        )
-
-    private def toBotCommand: BotCommand = BotCommand(command, description)
-  }
-
-  private object AIBotCommand {
-    def fromString(command: String): Option[AIBotCommand] = values.find(_.command == command)
-
-    def setCommands(): F[Boolean] = setMyCommands(
-      commands = values.map(_.toBotCommand).toList
-    ).exec
-  }
 
   private def onCommand(msg: Message, command: String, args: String): F[Unit] = {
     AIBotCommand.fromString(command) match {
@@ -100,7 +52,7 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
   }
 
   private def onPrivateChatMessage(msg: Message): F[Unit] = {
-    requestHelper.requestChatCompletion(
+    requestChatCompletion(
       msg = msg,
       onResponse = response =>
         for {
@@ -118,7 +70,7 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
     getMe().exec.flatMap { botUser =>
       if (msg.hasMentionForUser(botUser)) {
         // request chat completion
-        requestHelper.requestChatCompletion(
+        requestChatCompletion(
           msg = msg,
           onResponse = { response =>
             val user = msg.from.get
@@ -182,9 +134,9 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
     _ <- Async[F].delay(logger.info("Setting bot description..."))
     _ <- setMyShortDescription(config.about).exec
     _ <- setMyDescription(config.description).exec
-    _ <- Async[F].delay(logger.info("Setting bot commands..."))
+    _ = logger.info("Setting bot commands...")
     _ <- AIBotCommand.setCommands()
-    _ <- Async[F].delay(logger.info("Ready to start bot"))
+    _ = logger.info("Ready to start bot")
     _ <- super.start()
   } yield {}
 }

@@ -12,11 +12,13 @@ import undiy.aibot.ai.AIService
 import undiy.aibot.bot.TelegramModelExt.*
 import undiy.aibot.context.ContextService
 
-final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
+trait AIBotRequestHelper[F[_]: Async: Api](using
     aiService: AIService[F],
     contextService: ContextService[F]
 ) {
   private val logger = org.log4s.getLogger
+
+  val config: BotConfig
 
   def requestCompletion(chat: Chat, prompt: String, onResponse: String => F[Unit]): F[Unit] = {
     if (config.streaming) {
