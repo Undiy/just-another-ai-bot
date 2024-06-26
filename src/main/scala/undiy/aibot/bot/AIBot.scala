@@ -6,6 +6,7 @@ import cats.syntax.all.*
 import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.client.middleware.Logger
 import telegramium.bots.*
+import telegramium.bots.high.Methods.answerCallbackQuery
 import telegramium.bots.high.implicits.*
 import telegramium.bots.high.messageentities.MessageEntities
 import telegramium.bots.high.{Api, BotApi, LongPollBot}
@@ -128,6 +129,22 @@ class AIBot[F[_]: Async: Parallel](val config: BotConfig)(using
     } else {
       Async[F].unit
     }
+  }
+
+  override def onCallbackQuery(query: CallbackQuery): F[Unit] = {
+    AIBotButton
+      .fromQuery(query)
+      .flatMap { button =>
+        query.message
+          .collect { case msg: Message =>
+            for {
+              answer <- button.action(msg)
+              _ <- answerCallbackQuery(callbackQueryId = query.id, text = answer).exec
+              _ <- deleteMessage(chatId = ChatIntId(msg.chat.id), messageId = msg.messageId).exec
+            } yield {}
+          }
+      }
+      .getOrElse(Async[F].unit)
   }
 
   override def start(): F[Unit] = for {
