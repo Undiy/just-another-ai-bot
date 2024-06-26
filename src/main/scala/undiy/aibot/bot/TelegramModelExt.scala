@@ -10,13 +10,6 @@ import java.time.{Instant, OffsetDateTime, ZoneOffset}
 object TelegramModelExt {
   extension (msg: Message) {
     def toContextMessage: ContextMessage = {
-//      val rawText = msg.text.getOrElse("")
-//      // model doesn't handle telegram mentions (e.g. @username ) well, so let's strip the @ char
-//      val processedText = msg.entities.foldLeft(rawText)((text, me) => me match {
-//        case MentionMessageEntity(offset, _) => text.updated(offset, ' ')
-//        case _ => text
-//      })
-
       ContextMessage(
         messageId = msg.messageId,
         content = msg.text.getOrElse(""),

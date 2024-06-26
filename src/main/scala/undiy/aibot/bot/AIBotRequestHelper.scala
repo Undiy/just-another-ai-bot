@@ -95,7 +95,11 @@ trait AIBotRequestHelper[F[_]: Async: Api](using
     stream <- request
     _ <- stream
       // stream come in tokens, gluing them back to paragraphs
-      .groupAdjacentBy(_.contains('\n'))
+      // 1. split on newlines leaving the separators
+      .flatMap { s => Stream(s.split("\n", -1).flatMap(List("\n", _)).drop(1)*) }
+      // 2. group text separated by newlines in chunks
+      .groupAdjacentBy(_ == "\n")
+      // 3. glue the chunks
       .map { case (_, chunk) => Stream.chunk(chunk).compile.string }
       .filter(_.trim.nonEmpty)
       .foreach(onResponsePart)

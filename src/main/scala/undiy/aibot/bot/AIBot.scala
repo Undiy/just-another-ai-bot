@@ -75,16 +75,25 @@ class AIBot[F[_]: Async: Parallel](val config: BotConfig)(using
           msg = msg,
           onResponse = { response =>
             val user = msg.from.get
-            val responseEntities = MessageEntities()
-              .textMention(
-                user.username match {
-                  case Some(username) => s"@$username"
-                  case None           => user.firstName
-                },
-                user
-              )
-              .plain(" ")
-              .plain(response)
+
+            val responseEntities = {
+              // sometimes model is smart enough to add the mention by itself
+              if (user.username.exists(username => response.contains(s"@$username"))) {
+                MessageEntities().plain(response)
+              } else {
+                MessageEntities()
+                  .textMention(
+                    user.username match {
+                      case Some(username) => s"@$username"
+                      case None           => user.firstName
+                    },
+                    user
+                  )
+                  .plain(" ")
+                  .plain(response)
+              }
+            }
+
             for {
               newMessage <- sendMessage(
                 chatId = ChatIntId(msg.chat.id),
