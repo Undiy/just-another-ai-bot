@@ -9,11 +9,7 @@ import undiy.aibot.context.model.ContextMessage
 trait ContextService[F[_]] {
   def saveContextMessage(message: ContextMessage): F[Unit]
 
-  def getContextMessages(
-      chatId: Long,
-      limit: Option[Int]
-  ): F[List[ContextMessage]]
+  def getContextMessages(chatId: Long, limit: Option[Int]): F[List[ContextMessage]]
 
   def deleteContextMessages(chatId: Long): F[Unit]
 }
-

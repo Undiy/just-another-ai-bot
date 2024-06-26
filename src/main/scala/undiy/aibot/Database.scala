@@ -20,9 +20,7 @@ object Database {
     * @return
     *   skunk session resource
     */
-  def init[F[_]: Async: Tracer: Network: Console](
-      config: DbConfig
-  ): Resource[F, Session[F]] = {
+  def init[F[_]: Async: Tracer: Network: Console](config: DbConfig): Resource[F, Session[F]] = {
 
     for {
       migration <- Resource.eval(
@@ -35,16 +33,13 @@ object Database {
               user = config.user,
               database = config.database,
               password = Some(config.password),
-              ssl =
-                skunk.SSL.None // skunk.SSL config, default is skunk.SSL.None
+              ssl = skunk.SSL.None // skunk.SSL config, default is skunk.SSL.None
             )
           )
           .runMigration
       )
 
-      _ = logger.info(
-        s"Migration completed with ${migration.migrationsExecuted} migrations"
-      )
+      _ = logger.info(s"Migration completed with ${migration.migrationsExecuted} migrations")
 
       session <- Session.single[F](
         host = config.host,

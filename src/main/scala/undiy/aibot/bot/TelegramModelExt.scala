@@ -27,17 +27,17 @@ object TelegramModelExt {
       )
     }
 
-    def hasCommand: Boolean = msg.entities.exists({
+    def hasCommand: Boolean = msg.entities.exists {
       case command: BotCommandMessageEntity => true
       case _                                => false
-    })
+    }
 
     // command and the rest of text as arg
     def getCommand: Option[(String, String)] = msg.entities
-      .find({
+      .find {
         case command: BotCommandMessageEntity => true
         case _                                => false
-      })
+      }
       .map(entity =>
         (
           getEntityContent(entity)

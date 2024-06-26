@@ -16,8 +16,7 @@ import undiy.aibot.context.model.{ContextChat, ContextMessage, ContextUser}
   * @tparam F
   *   effect type
   */
-final class DbContextService[F[_]: Async](using session: Session[F])
-    extends ContextService[F] {
+final class DbContextService[F[_]: Async](using session: Session[F]) extends ContextService[F] {
 
   private val messageDecoder: Decoder[ContextMessage] =
     (int4 *: text *: timestamptz *: int8 *: varchar.opt *: int8 *: bool *: varchar.opt)
@@ -84,9 +83,8 @@ final class DbContextService[F[_]: Async](using session: Session[F])
       ON CONFLICT (chat_id, message_id) DO UPDATE
       SET content = EXCLUDED.content
     """.command
-      .contramap {
-        case ContextMessage(messageId, content, createdAt, chat, user) =>
-          messageId *: content *: createdAt *: chat.id *: user.id *: EmptyTuple
+      .contramap { case ContextMessage(messageId, content, createdAt, chat, user) =>
+        messageId *: content *: createdAt *: chat.id *: user.id *: EmptyTuple
       }
 
   private val deleteMessages: Command[Long] =

@@ -48,8 +48,7 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
     case Prompt
         extends AIBotCommand(
           command = "prompt",
-          description =
-            "Make a simple prompt with no additional context (message history)",
+          description = "Make a simple prompt with no additional context (message history)",
           action = (msg, prompt) => {
             if (prompt.trim.nonEmpty) {
               requestHelper.requestCompletion(
@@ -64,8 +63,7 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
             } else {
               sendMessage(
                 chatId = ChatIntId(msg.chat.id),
-                text =
-                  "Please write the actual prompt after the /prompt command"
+                text = "Please write the actual prompt after the /prompt command"
               ).exec.void
             }
           }
@@ -74,8 +72,7 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
     case ResetContext
         extends AIBotCommand(
           command = "resetcontext",
-          description =
-            "Deletes all the bot's message context for this chat. WARNING: this cannot be undone",
+          description = "Deletes all the bot's message context for this chat. WARNING: this cannot be undone",
           // TODO add confirmation
           action = (msg, _) => contextService.deleteContextMessages(msg.chat.id)
         )
@@ -84,19 +81,14 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
   }
 
   private object AIBotCommand {
-    def fromString(command: String): Option[AIBotCommand] =
-      values.find(_.command == command)
+    def fromString(command: String): Option[AIBotCommand] = values.find(_.command == command)
 
     def setCommands(): F[Boolean] = setMyCommands(
       commands = values.map(_.toBotCommand).toList
     ).exec
   }
 
-  private def onCommand(
-      msg: Message,
-      command: String,
-      args: String
-  ): F[Unit] = {
+  private def onCommand(msg: Message, command: String, args: String): F[Unit] = {
     AIBotCommand.fromString(command) match {
       case Some(botCommand) => botCommand.action(msg, args)
       case None =>
@@ -123,7 +115,7 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
 
   private def onChatMessage(msg: Message): F[Unit] = {
     // TODO cache botUser
-    getMe().exec.flatMap({ botUser =>
+    getMe().exec.flatMap { botUser =>
       if (msg.hasMentionForUser(botUser)) {
         // request chat completion
         requestHelper.requestChatCompletion(
@@ -156,7 +148,7 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
         // just save context message
         contextService.saveContextMessage(msg.toContextMessage)
       }
-    })
+    }
   }
 
   override def onMessage(msg: Message): F[Unit] = {
@@ -211,17 +203,14 @@ object AIBot {
     * @return
     *   async (shouldn't terminate while the bot is running)
     */
-  def start[F[_]: Async: Parallel](
-      config: BotConfig
-  )(using AIService[F], ContextService[F]): F[Unit] = {
+  def start[F[_]: Async: Parallel](config: BotConfig)(using AIService[F], ContextService[F]): F[Unit] = {
     BlazeClientBuilder[F].resource.use { httpClient =>
       val http = Logger(
         logBody = config.log.body,
         logHeaders = config.log.headers
       )(httpClient)
 
-      given Api[F] =
-        BotApi(http, baseUrl = s"https://api.telegram.org/bot${config.token}")
+      given Api[F] = BotApi(http, baseUrl = s"https://api.telegram.org/bot${config.token}")
 
       AIBot[F](config).start()
     }

@@ -18,11 +18,7 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
 ) {
   private val logger = org.log4s.getLogger
 
-  def requestCompletion(
-      chat: Chat,
-      prompt: String,
-      onResponse: String => F[Unit]
-  ): F[Unit] = {
+  def requestCompletion(chat: Chat, prompt: String, onResponse: String => F[Unit]): F[Unit] = {
     if (config.streaming) {
       performAIServiceStreamedRequest(
         chat = chat,
@@ -38,10 +34,7 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
     }
   }
 
-  def requestChatCompletion(
-      msg: Message,
-      onResponse: String => F[Unit]
-  ): F[Unit] = {
+  def requestChatCompletion(msg: Message, onResponse: String => F[Unit]): F[Unit] = {
     if (config.streaming) {
       performAIServiceStreamedRequest(
         chat = msg.chat,
@@ -66,11 +59,7 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
     }
   }
 
-  private def performAIServiceRequest(
-      chat: Chat,
-      request: F[String],
-      onResponse: String => F[Unit]
-  ): F[Unit] = for {
+  private def performAIServiceRequest(chat: Chat, request: F[String], onResponse: String => F[Unit]): F[Unit] = for {
     thinkingMessage <- sendMessage(
       chatId = ChatIntId(chat.id),
       text = config.messages.processing
@@ -84,8 +73,7 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
         ).exec.void
       },
       // we're interested only in non-empty response
-      response =>
-        if (response.trim.nonEmpty) onResponse(response) else Async[F].unit
+      response => if (response.trim.nonEmpty) onResponse(response) else Async[F].unit
     )
     _ <- deleteMessage(
       chatId = ChatIntId(chat.id),
@@ -106,20 +94,18 @@ final class AIBotRequestHelper[F[_]: Async: Api](config: BotConfig)(using
     _ <- stream
       // stream come in tokens, gluing them back to paragraphs
       .groupAdjacentBy(_.contains('\n'))
-      .map({ case (_, chunk) =>
-        Stream.chunk(chunk).compile.string
-      })
+      .map { case (_, chunk) => Stream.chunk(chunk).compile.string }
       .filter(_.trim.nonEmpty)
       .foreach(onResponsePart)
       .compile
       .drain
-      .recoverWith({ e =>
+      .recoverWith { e =>
         logger.warn(e)("Failed to perform AI request")
         sendMessage(
           chatId = ChatIntId(chat.id),
           text = config.messages.error
         ).exec.void
-      })
+      }
     _ <- deleteMessage(
       chatId = ChatIntId(chat.id),
       messageId = thinkingMessage.messageId

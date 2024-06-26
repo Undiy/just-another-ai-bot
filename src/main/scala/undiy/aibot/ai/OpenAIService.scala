@@ -7,11 +7,7 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import cats.effect.Async
 import fs2.Stream
 import io.cequence.openaiscala.domain.settings.CreateChatCompletionSettings
-import io.cequence.openaiscala.domain.{
-  AssistantMessage,
-  SystemMessage,
-  UserMessage
-}
+import io.cequence.openaiscala.domain.{AssistantMessage, SystemMessage, UserMessage}
 import io.cequence.openaiscala.service.OpenAIChatCompletionServiceFactory
 import io.cequence.openaiscala.service.OpenAIStreamedServiceImplicits.given
 import undiy.aibot.AIConfig
@@ -19,8 +15,7 @@ import undiy.aibot.context.model.ContextMessage
 
 import scala.concurrent.ExecutionContext
 
-/** AIService implementation that makes request to openai-compatible chat
-  * completion API
+/** AIService implementation that makes request to openai-compatible chat completion API
   * @param config
   *   configuration
   * @param async$F$0
@@ -30,10 +25,7 @@ import scala.concurrent.ExecutionContext
   * @tparam F
   *   effect type
   */
-final class OpenAIService[F[_]: Async](
-    config: AIConfig
-)(using ec: ExecutionContext)
-    extends AIService[F] {
+final class OpenAIService[F[_]: Async](config: AIConfig)(using ec: ExecutionContext) extends AIService[F] {
 
   private val logger = org.log4s.getLogger
 
@@ -50,7 +42,7 @@ final class OpenAIService[F[_]: Async](
   )
 
   override def makeCompletion(prompt: String): F[String] = Async[F].fromFuture(
-    Async[F].delay({
+    Async[F].delay {
       logger.debug(s"""makeCompletion prompt: "$prompt" settings: $settings""")
       aiService
         .createChatCompletion(
@@ -64,7 +56,7 @@ final class OpenAIService[F[_]: Async](
           logger.debug(s"makeCompletion response: ${chatCompletion.choices.head}")
           chatCompletion.choices.head.message.content
         }
-    })
+    }
   )
 
   override def makeCompletionStreamed(prompt: String): Stream[F, String] = {
@@ -84,45 +76,38 @@ final class OpenAIService[F[_]: Async](
       .toStream
   }
 
-  override def makeChatCompletion(messages: List[ContextMessage]): F[String] =
-    Async[F].fromFuture(
-      Async[F].delay({
-        val chatMessages =
-          SystemMessage("You are a helpful chat bot") :: messages.map({ m =>
-            if (m.user.isBot) {
-              AssistantMessage(m.content, m.user.username)
-            } else {
-              UserMessage(m.content, m.user.username)
-            }
-          })
-
-        logger.debug(s"makeChatCompletion Messages:\n${chatMessages.mkString("\n")}\nsettings: $settings")
-
-        aiService
-          .createChatCompletion(
-            messages = chatMessages,
-            settings = settings
-          )
-          .map { chatCompletion =>
-
-            logger.debug(s"makeChatCompletion: ${chatCompletion.choices.head}")
-
-            chatCompletion.choices.head.message.content
-          }
-      })
-    )
-
-  override def makeChatCompletionStreamed(
-      messages: List[ContextMessage]
-  ): Stream[F, String] = {
-    val chatMessages =
-      SystemMessage("You are a helpful chat bot") :: messages.map({ m =>
+  override def makeChatCompletion(messages: List[ContextMessage]): F[String] = Async[F].fromFuture(
+    Async[F].delay {
+      val chatMessages = SystemMessage("You are a helpful chat bot") :: messages.map { m =>
         if (m.user.isBot) {
           AssistantMessage(m.content, m.user.username)
         } else {
           UserMessage(m.content, m.user.username)
         }
-      })
+      }
+
+      logger.debug(s"makeChatCompletion Messages:\n${chatMessages.mkString("\n")}\nsettings: $settings")
+
+      aiService
+        .createChatCompletion(
+          messages = chatMessages,
+          settings = settings
+        )
+        .map { chatCompletion =>
+          logger.debug(s"makeChatCompletion: ${chatCompletion.choices.head}")
+          chatCompletion.choices.head.message.content
+        }
+    }
+  )
+
+  override def makeChatCompletionStreamed(messages: List[ContextMessage]): Stream[F, String] = {
+    val chatMessages = SystemMessage("You are a helpful chat bot") :: messages.map { m =>
+      if (m.user.isBot) {
+        AssistantMessage(m.content, m.user.username)
+      } else {
+        UserMessage(m.content, m.user.username)
+      }
+    }
 
     logger.debug(s"makeChatCompletionStreamed Messages:\n${chatMessages.mkString("\n")}\nsettings: $settings")
 

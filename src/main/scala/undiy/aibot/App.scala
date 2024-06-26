@@ -19,11 +19,11 @@ object App extends IOApp {
     (
       IO(Config.load()),
       Async[IO].executionContext
-    ).flatMapN({ case (config, ec) =>
+    ).flatMapN { case (config, ec) =>
       logger.info("Config loaded")
       Database
         .init[IO](config.db)
-        .use(session => {
+        .use { session =>
           logger.info("DB connection ready")
           given Session[IO] = session
 
@@ -32,7 +32,7 @@ object App extends IOApp {
           given ContextService[IO] = DbContextService[IO]
 
           AIBot.start[IO](config.bot).as(ExitCode.Success)
-        })
-    })
+        }
+    }
   }
 }

@@ -25,8 +25,7 @@ trait AIService[F[_]] {
     */
   def makeChatCompletion(messages: List[ContextMessage]): F[String]
 
-  /** Make completion based on prompt with no additional context, streamed
-    * version
+  /** Make completion based on prompt with no additional context, streamed version
     * @param prompt
     *   a textual request to AI assistant
     * @return
@@ -40,7 +39,5 @@ trait AIService[F[_]] {
     * @return
     *   a streamed response
     */
-  def makeChatCompletionStreamed(
-      messages: List[ContextMessage]
-  ): Stream[F, String]
+  def makeChatCompletionStreamed(messages: List[ContextMessage]): Stream[F, String]
 }
