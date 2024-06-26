@@ -39,45 +39,46 @@ final class OpenAIService[F[_]: Async](
 
   private given Materializer = Materializer(ActorSystem("openai-client-system"))
 
-  private val aiService = OpenAIChatCompletionServiceFactory.withStreaming(
+  private lazy val aiService = OpenAIChatCompletionServiceFactory.withStreaming(
     coreUrl = config.baseUrl,
     authHeaders = Seq(("Authorization", s"Bearer ${config.apiKey}"))
   )
 
+  private val settings = CreateChatCompletionSettings(
+    model = config.model,
+    max_tokens = config.maxTokens
+  )
+
   override def makeCompletion(prompt: String): F[String] = Async[F].fromFuture(
-    Async[F].delay(
+    Async[F].delay({
+      logger.debug(s"""makeCompletion prompt: "$prompt" settings: $settings""")
       aiService
         .createChatCompletion(
           messages = Seq(
             SystemMessage("You are a kind helpful assistant."),
             UserMessage(prompt)
           ),
-          settings = CreateChatCompletionSettings(
-            model = config.model,
-            max_tokens = config.maxTokens
-          )
+          settings = settings
         )
         .map { chatCompletion =>
-          logger.info(s"Response: ${chatCompletion.choices.head}")
+          logger.debug(s"makeCompletion response: ${chatCompletion.choices.head}")
           chatCompletion.choices.head.message.content
         }
-    )
+    })
   )
 
   override def makeCompletionStreamed(prompt: String): Stream[F, String] = {
+    logger.debug(s"""makeCompletionStreamed prompt: "$prompt" settings: $settings""")
     aiService
       .createChatCompletionStreamed(
         messages = Seq(
           SystemMessage("You are a kind helpful assistant."),
           UserMessage(prompt)
         ),
-        settings = CreateChatCompletionSettings(
-          model = config.model,
-          max_tokens = config.maxTokens
-        )
+        settings = settings
       )
       .mapConcat { chatCompletion =>
-        logger.info(s"Response: ${chatCompletion.choices.head}")
+        logger.debug(s"makeCompletionStreamed response chunk: ${chatCompletion.choices.head}")
         chatCompletion.choices.head.delta.content
       }
       .toStream
@@ -95,19 +96,16 @@ final class OpenAIService[F[_]: Async](
             }
           })
 
-        logger.info(s"Messages:\n${chatMessages.mkString("\n")}")
+        logger.debug(s"makeChatCompletion Messages:\n${chatMessages.mkString("\n")}\nsettings: $settings")
 
         aiService
           .createChatCompletion(
             messages = chatMessages,
-            settings = CreateChatCompletionSettings(
-              model = config.model,
-              max_tokens = config.maxTokens
-            )
+            settings = settings
           )
           .map { chatCompletion =>
 
-            logger.info(s"Response: ${chatCompletion.choices.head}")
+            logger.debug(s"makeChatCompletion: ${chatCompletion.choices.head}")
 
             chatCompletion.choices.head.message.content
           }
@@ -126,18 +124,15 @@ final class OpenAIService[F[_]: Async](
         }
       })
 
-    logger.info(s"Messages:\n${chatMessages.mkString("\n")}")
+    logger.debug(s"makeChatCompletionStreamed Messages:\n${chatMessages.mkString("\n")}\nsettings: $settings")
 
     aiService
       .createChatCompletionStreamed(
         messages = chatMessages,
-        settings = CreateChatCompletionSettings(
-          model = config.model,
-          max_tokens = config.maxTokens
-        )
+        settings = settings
       )
       .mapConcat { chatCompletion =>
-        logger.info(s"Response: ${chatCompletion.choices.head}")
+        logger.debug(s"makeChatCompletionStreamed response chunk: ${chatCompletion.choices.head}")
         chatCompletion.choices.head.delta.content
       }
       .toStream

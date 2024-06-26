@@ -20,9 +20,11 @@ object App extends IOApp {
       IO(Config.load()),
       Async[IO].executionContext
     ).flatMapN({ case (config, ec) =>
+      logger.info("Config loaded")
       Database
         .init[IO](config.db)
         .use(session => {
+          logger.info("DB connection ready")
           given Session[IO] = session
 
           given AIService[IO] = OpenAIService(config.ai)(using Async[IO], ec)

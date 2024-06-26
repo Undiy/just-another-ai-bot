@@ -187,9 +187,12 @@ class AIBot[F[_]: Async: Parallel](config: BotConfig)(using
   }
 
   override def start(): F[Unit] = for {
+    _ <- Async[F].delay(logger.info("Setting bot description..."))
     _ <- setMyShortDescription(config.about).exec
     _ <- setMyDescription(config.description).exec
+    _ <- Async[F].delay(logger.info("Setting bot commands..."))
     _ <- AIBotCommand.setCommands()
+    _ <- Async[F].delay(logger.info("Ready to start bot"))
     _ <- super.start()
   } yield {}
 }
