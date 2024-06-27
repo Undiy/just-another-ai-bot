@@ -59,4 +59,24 @@ object FakeData {
       entities = messageEntities.toTelegramEntities()
     )
   }
+
+  def makeMessageWithCommand(
+      id: Int,
+      chat: Chat,
+      user: User,
+      command: String,
+      args: String
+  ): Message = {
+    val messageEntities = MessageEntities()
+      .botCommand(command)
+      .plain(" ")
+      .plain(args)
+    makeMessage(
+      id = id,
+      chat = chat,
+      user = user,
+      text = Some(messageEntities.toPlainText()),
+      entities = messageEntities.toTelegramEntities()
+    )
+  }
 }

@@ -52,6 +52,8 @@ class RequestHelperTests extends CatsEffectSuite {
   }
 
   test("test requestChatCompletion") {
+    val msg = makeMessage(initMessageId, chat, user, Some(sampleRequest))
+
     for {
       contextService <- FakeContextService()
       aiService = FakeAIService()
@@ -59,7 +61,6 @@ class RequestHelperTests extends CatsEffectSuite {
       helper = new AIBotRequestHelper(using Async[IO], api, aiService, contextService) {
         val config: BotConfig = BotConfig(token = "", streaming = false)
       }
-      msg = makeMessage(initMessageId, chat, user, Some(sampleRequest))
       _ <- helper.requestChatCompletion(
         msg = msg,
         onResponse = response => IO(response).assertEquals(sampleResponse)
@@ -72,6 +73,8 @@ class RequestHelperTests extends CatsEffectSuite {
   }
 
   test("test requestChatCompletion streamed") {
+    val msg = makeMessage(initMessageId, chat, user, Some(sampleRequest))
+
     for {
       contextService <- FakeContextService()
       aiService = FakeAIService()
@@ -79,7 +82,6 @@ class RequestHelperTests extends CatsEffectSuite {
       helper = new AIBotRequestHelper(using Async[IO], api, aiService, contextService) {
         val config: BotConfig = BotConfig(token = "", streaming = true)
       }
-      msg = makeMessage(initMessageId, chat, user, Some(sampleRequest))
       _ <- helper.requestChatCompletion(
         msg = msg,
         onResponse = response => IO(response).assert(sampleResponseParts.contains(_))
