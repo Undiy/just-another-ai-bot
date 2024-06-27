@@ -1,35 +1,33 @@
-package undiy.aibot
+package undiy.aibot.bot
 
 import cats.effect.{Async, IO}
 import munit.CatsEffectSuite
-import undiy.aibot.bot.AIBotRequestHelper
+import undiy.aibot.BotConfig
 import undiy.aibot.bot.TelegramModelExt.*
 import undiy.aibot.fake.FakeData.*
 import undiy.aibot.fake.{FakeAIService, FakeBotApi, FakeContextService}
 
-import scala.collection.immutable.TreeSet
-
 class RequestHelperTests extends CatsEffectSuite {
 
-  val lastMessageId = 1
+  val initMessageId = 1
 
   test("test requestCompletion") {
     for {
       contextService <- FakeContextService()
       aiService = FakeAIService()
-      api <- FakeBotApi(chat, lastMessageId)
+      api <- FakeBotApi(initMessageId)
       helper = new AIBotRequestHelper(using Async[IO], api, aiService, contextService) {
         val config: BotConfig = BotConfig(token = "", streaming = false)
       }
       _ <- helper.requestCompletion(
         chat = chat,
         prompt = sampleRequest,
-        onResponse = response => IO(response).assertEquals(FakeAIService.sampleResponse)
+        onResponse = response => IO(response).assertEquals(sampleResponse)
       )
       // no context should be saved
       _ <- contextService.state.get.assert(_.isEmpty)
       // one message should be sent
-      _ <- api.lastMessageId.get.assert(_ == lastMessageId + 1)
+      _ <- api.lastMessageId.get.assert(_ == initMessageId + 1)
     } yield {}
   }
 
@@ -37,17 +35,17 @@ class RequestHelperTests extends CatsEffectSuite {
     for {
       contextService <- FakeContextService()
       aiService = FakeAIService()
-      api <- FakeBotApi(chat, lastMessageId)
+      api <- FakeBotApi(initMessageId)
       helper = new AIBotRequestHelper(using Async[IO], api, aiService, contextService) {
         val config: BotConfig = BotConfig(token = "", streaming = true)
       }
       _ <- helper.requestCompletion(
         chat = chat,
         prompt = sampleRequest,
-        onResponse = response => IO(response).assert(FakeAIService.sampleResponse.split('\n').map(_.trim).contains(_))
+        onResponse = response => IO(response).assert(sampleResponseParts.contains(_))
       )
       // one message should be sent
-      _ <- api.lastMessageId.get.assertEquals(lastMessageId + 1)
+      _ <- api.lastMessageId.get.assertEquals(initMessageId + 1)
       // no context should be saved
       _ <- contextService.state.get.assert(_.isEmpty)
     } yield {}
@@ -57,20 +55,19 @@ class RequestHelperTests extends CatsEffectSuite {
     for {
       contextService <- FakeContextService()
       aiService = FakeAIService()
-      api <- FakeBotApi(chat, lastMessageId)
+      api <- FakeBotApi(initMessageId)
       helper = new AIBotRequestHelper(using Async[IO], api, aiService, contextService) {
         val config: BotConfig = BotConfig(token = "", streaming = false)
       }
-      msg = makeMessage(lastMessageId, chat, user, Some(sampleRequest))
+      msg = makeMessage(initMessageId, chat, user, Some(sampleRequest))
       _ <- helper.requestChatCompletion(
         msg = msg,
-        onResponse = response => IO(response).assertEquals(FakeAIService.sampleResponse)
+        onResponse = response => IO(response).assertEquals(sampleResponse)
       )
       // one message should be sent
-      _ <- api.lastMessageId.get.assertEquals(lastMessageId + 1)
+      _ <- api.lastMessageId.get.assertEquals(initMessageId + 1)
       // one message should be saved in context
-      _ <- contextService.state.get.map(_.keySet).assert(TreeSet(lastMessageId).iterator.sameElements(_))
-      _ <- contextService.state.get.map(_(lastMessageId)).assertEquals(msg.toContextMessage)
+      _ <- contextService.state.get.assertEquals(List(msg.toContextMessage))
     } yield {}
   }
 
@@ -78,20 +75,19 @@ class RequestHelperTests extends CatsEffectSuite {
     for {
       contextService <- FakeContextService()
       aiService = FakeAIService()
-      api <- FakeBotApi(chat, lastMessageId)
+      api <- FakeBotApi(initMessageId)
       helper = new AIBotRequestHelper(using Async[IO], api, aiService, contextService) {
         val config: BotConfig = BotConfig(token = "", streaming = true)
       }
-      msg = makeMessage(lastMessageId, chat, user, Some(sampleRequest))
+      msg = makeMessage(initMessageId, chat, user, Some(sampleRequest))
       _ <- helper.requestChatCompletion(
         msg = msg,
-        onResponse = response => IO(response).assert(FakeAIService.sampleResponse.split('\n').map(_.trim).contains(_))
+        onResponse = response => IO(response).assert(sampleResponseParts.contains(_))
       )
       // one message should be sent
-      _ <- api.lastMessageId.get.assertEquals(lastMessageId + 1)
+      _ <- api.lastMessageId.get.assertEquals(initMessageId + 1)
       // one message should be saved in context
-      _ <- contextService.state.get.map(_.keySet).assert(TreeSet(lastMessageId).iterator.sameElements(_))
-      _ <- contextService.state.get.map(_(lastMessageId)).assertEquals(msg.toContextMessage)
+      _ <- contextService.state.get.assertEquals(List(msg.toContextMessage))
     } yield {}
   }
 }
