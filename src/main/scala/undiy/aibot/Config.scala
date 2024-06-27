@@ -32,9 +32,9 @@ extension (c: ConfigReader.type)
 case class BotConfig(
     token: String,
     streaming: Boolean = true,
-    about: Option[String],
-    description: Option[String],
-    maxContextMessages: Option[Int],
+    about: Option[String] = None,
+    description: Option[String] = None,
+    maxContextMessages: Option[Int] = None,
     messages: BotMessages = BotMessages(),
     log: BotRequestLogConfig = BotRequestLogConfig()
 )

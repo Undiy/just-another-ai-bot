@@ -16,7 +16,9 @@ lazy val root = project
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.7",
       "org.log4s" %% "log4s" % "1.10.0",
       "org.slf4j" % "slf4j-simple" % "2.0.13",
-      "org.scalameta" %% "munit" % "1.0.0" % Test
+
+      "org.scalameta" %% "munit" % "1.0.0" % Test,
+      "org.typelevel" %% "munit-cats-effect" % "2.0.0" % Test
     )
   )
 
